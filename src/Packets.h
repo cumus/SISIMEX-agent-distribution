@@ -17,12 +17,19 @@ enum class PacketType
 	// MCP <-> YP
 	QueryMCCsForItem,
 	ReturnMCCsForItem,
-	
+
 	// MCP <-> MCC
-	// TODO
-	
+	PositionRequest,
+	PositionAnswer,
+	NegociationProposalRequest,
+	NegociationProposalAnswer,
+
 	// UCP <-> UCC
-	// TODO
+	DataRequest,
+	ConstraintsAcceptanceRequest,
+	ConstraintsAcceptanceAnswer,
+	ConstraintsDatasetDelivery,
+	DataDelivery,
 	
 	Last
 };
