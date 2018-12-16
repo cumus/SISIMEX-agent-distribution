@@ -33,16 +33,14 @@ public:
 
 private:
 
-	bool registerIntoYellowPages();
-	
-	void unregisterFromYellowPages();
-
-	void createChildUCC();
-
-	void destroyChildUCC();
-
 	uint16_t _contributedItemId; /**< The contributed item. */
 	uint16_t _constraintItemId; /**< The constraint item. */
 
-	UCCPtr _ucc; /**< Child UCC. */
+	bool registerIntoYellowPages();
+	void unregisterFromYellowPages();
+
+	// UCC
+	UCCPtr _ucc;
+	void createChildUCC();
+	void destroyChildUCC();
 };

@@ -6,13 +6,15 @@
 
 enum State
 {
-	ST_INIT,
-	ST_REGISTERING,
-	ST_IDLE,
-	
-	// TODO: Other states
+	ST_MCC_INIT,
+	ST_MCC_REGISTERING,
+	ST_MCC_IDLE,
 
-	ST_FINISHED
+	ST_MCC_NEGOTIATING,
+	ST_MCC_NEGOTIATION_FINISHED,
+	ST_MCC_UNREGISTERING,
+
+	ST_MCC_FINISHED
 };
 
 MCC::MCC(Node *node, uint16_t contributedItemId, uint16_t constraintItemId) :
@@ -20,7 +22,7 @@ MCC::MCC(Node *node, uint16_t contributedItemId, uint16_t constraintItemId) :
 	_contributedItemId(contributedItemId),
 	_constraintItemId(constraintItemId)
 {
-	setState(ST_INIT);
+	setState(ST_MCC_INIT);
 }
 
 
@@ -32,22 +34,35 @@ void MCC::update()
 {
 	switch (state())
 	{
-	case ST_INIT:
+	case ST_MCC_INIT:
 		if (registerIntoYellowPages()) {
-			setState(ST_REGISTERING);
+			setState(ST_MCC_REGISTERING);
 		}
 		else {
-			setState(ST_FINISHED);
+			setState(ST_MCC_FINISHED);
 		}
 		break;
 
-	case ST_REGISTERING:
+	case ST_MCC_REGISTERING:
 		// See OnPacketReceived()
 		break;
 
 		// TODO: Handle other states
-
-	case ST_FINISHED:
+	case ST_MCC_NEGOTIATING:
+		if (_ucc->negotiationFinished()) {
+			if (_ucc->negotiationAgreement()) {
+				setState(ST_MCC_NEGOTIATION_FINISHED);
+			}
+			else {
+				setState(ST_MCC_IDLE);
+			}
+			destroyChildUCC();
+		}
+		break;
+	case ST_MCC_UNREGISTERING:
+		// See OnPacketReceived()
+		break;
+	case ST_MCC_FINISHED:
 		destroy();
 	}
 }
@@ -58,7 +73,7 @@ void MCC::stop()
 	destroyChildUCC();
 
 	unregisterFromYellowPages();
-	setState(ST_FINISHED);
+	setState(ST_MCC_FINISHED);
 }
 
 
@@ -69,9 +84,10 @@ void MCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 	switch (packetType)
 	{
 	case PacketType::RegisterMCCAck:
-		if (state() == ST_REGISTERING)
+	{
+		if (state() == ST_MCC_REGISTERING)
 		{
-			setState(ST_IDLE);
+			setState(ST_MCC_IDLE);
 			socket->Disconnect();
 		}
 		else
@@ -79,8 +95,53 @@ void MCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 			wLog << "OnPacketReceived() - PacketType::RegisterMCCAck was unexpected.";
 		}
 		break;
-
+	}
 	// TODO: Handle other packets
+	case PacketType::NegociationProposalRequest:
+	{
+		if (state() == ST_MCC_IDLE)
+		{
+			// Create UCC
+			createChildUCC();
+
+			// Send negotiation response
+			PacketHeader oPacketHead;
+			oPacketHead.packetType = PacketType::NegociationProposalAnswer;
+			oPacketHead.srcAgentId = id();
+			oPacketHead.dstAgentId = packetHeader.srcAgentId;
+
+			PacketStartNegotiationResponse oPacketData;
+			oPacketData.uccAgentId = _ucc->id();
+
+			OutputMemoryStream ostream;
+			oPacketHead.Write(ostream);
+			oPacketData.Write(ostream);
+
+			const std::string ip = socket->RemoteAddress().GetIPString();
+			uint16_t port = LISTEN_PORT_AGENTS;
+			sendPacketToAgent(ip, port, ostream);
+
+			setState(ST_MCC_NEGOTIATING);
+		}
+		else
+		{
+			wLog << "OnPacketReceived() - PacketType::NegociationProposalRequest was unexpected.";
+		}
+		break;
+	}
+	case PacketType::UnregisterMCCAck:
+	{
+		if (state() == ST_MCC_UNREGISTERING)
+		{
+			setState(ST_MCC_FINISHED);
+			socket->Disconnect();
+		}
+		else
+		{
+			wLog << "OnPacketReceived() - PacketType::UnregisterMCCAck was unexpected.";
+		}
+		break;
+	}
 
 	default:
 		wLog << "OnPacketReceived() - Unexpected PacketType.";
@@ -89,12 +150,12 @@ void MCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 
 bool MCC::isIdling() const
 {
-	return state() == ST_IDLE;
+	return state() == ST_MCC_IDLE;
 }
 
 bool MCC::negotiationFinished() const
 {
-	return state() == ST_FINISHED;
+	return state() == ST_MCC_FINISHED;
 }
 
 bool MCC::negotiationAgreement() const
@@ -143,9 +204,15 @@ void MCC::unregisterFromYellowPages()
 void MCC::createChildUCC()
 {
 	// TODO: Create a unicast contributor
+	destroyChildUCC(); // just in case
+	_ucc = App->agentContainer->createUCC(node(), _contributedItemId, _constraintItemId);
 }
 
 void MCC::destroyChildUCC()
 {
 	// TODO: Destroy the unicast contributor child
+	if (_ucc.get()) {
+		_ucc->stop();
+		_ucc.reset();
+	}
 }

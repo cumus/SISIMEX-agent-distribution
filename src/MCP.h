@@ -46,5 +46,13 @@ private:
 	unsigned int _searchDepth;
 
 	// TODO: Add extra attributes and methods?
+	
+	bool _negotiationAgreement; /**< Was there a negotiation agreement? */
+	bool sendNegotiationRequest(const AgentLocation &mccRegister);
+
+	// UCP
+	UCPPtr _ucp;
+	void createChildUCP(const AgentLocation &uccLoc);
+	void destroyChildUCP();
 };
 
