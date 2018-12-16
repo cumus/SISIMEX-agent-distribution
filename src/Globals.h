@@ -21,6 +21,8 @@ static const uint16_t LISTEN_PORT_AGENTS = 8001;
  */
 static const uint16_t NULL_AGENT_ID = 0;
 
+static const uint16_t NULL_ITEM_ID = 9999;
+
 /*
  * RANDOM INITIALIZATION:
  * Whether or not perform a random initialization of items among nodes.

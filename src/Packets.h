@@ -13,6 +13,7 @@ enum class PacketType
 	RegisterMCC,
 	RegisterMCCAck,
 	UnregisterMCC,
+	UnregisterMCCAck,
 
 	// MCP <-> YP
 	QueryMCCsForItem,
@@ -25,11 +26,16 @@ enum class PacketType
 	NegociationProposalAnswer,
 
 	// UCP <-> UCC
-	DataRequest,
+	RequestItem,
+	RequestItemResponse,
+	SendConstraint,
+	SendConstraintResponse,
+
+	/*DataRequest,
 	ConstraintsAcceptanceRequest,
 	ConstraintsAcceptanceAnswer,
 	ConstraintsDatasetDelivery,
-	DataDelivery,
+	DataDelivery,*/
 	
 	Last
 };
@@ -116,11 +122,61 @@ public:
 
 
 // MCP <-> MCC
-
 //TODO
 
+class PacketStartNegotiation {
+public:
+	// This packet has nothing
+};
 
+class PacketStartNegotiationResponse {
+public:
+	uint16_t uccAgentId;
+	void Read(InputMemoryStream &stream) {
+		stream.Read(uccAgentId);
+	}
+	void Write(OutputMemoryStream &stream) {
+		stream.Write(uccAgentId);
+	}
+};
 
 // UCP <-> UCC
-
 // TODO
+
+class PacketRequestItem {
+public:
+	uint16_t requestedItemId;
+	void Read(InputMemoryStream &stream) {
+		stream.Read(requestedItemId);
+	}
+	void Write(OutputMemoryStream &stream) {
+		stream.Write(requestedItemId);
+	}
+};
+
+class PacketRequestItemResponse {
+public:
+	uint16_t constraintItemId;
+	void Read(InputMemoryStream &stream) {
+		stream.Read(constraintItemId);
+	}
+	void Write(OutputMemoryStream &stream) {
+		stream.Write(constraintItemId);
+	}
+};
+
+class PacketSendConstraint {
+public:
+	uint16_t constraintItemId;
+	void Read(InputMemoryStream &stream) {
+		stream.Read(constraintItemId);
+	}
+	void Write(OutputMemoryStream &stream) {
+		stream.Write(constraintItemId);
+	}
+};
+
+class PacketSendConstraintResponse {
+public:
+	// This packet has nothing
+};
