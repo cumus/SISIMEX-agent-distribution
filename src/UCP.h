@@ -21,5 +21,27 @@ public:
 	void OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader, InputMemoryStream &stream) override;
 
 	// TODO
+
+	// Whether or not the negotiation finished
+	bool negotiationFinished() const;
+
+	// Whether ir not there was a negotiation agreement
+	bool negotiationAgreement() const;
+
+private:
+
+	void requestItem();
+	void createChildMCP(uint16_t constraintItemId);
+	void sendConstraint(uint16_t constraintItemId);
+	void destroyChildMCP();
+
+	uint16_t _requestedItemId; /**< The item to request. */
+
+	AgentLocation _uccLocation; /**< Location of the remote UCC agent. */
+
+	MCPPtr _mcp; /**< The child MCP. */
+
+	bool _negotiationAgreement; /**< Was there a negotiation agreement? */
+	unsigned int searchDepth = 0;
 };
 
