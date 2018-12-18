@@ -1,12 +1,12 @@
 #include "UCC.h"
 
-
 // TODO: Make an enum with the states
 enum State
 {
-	ST_WAITING_ITEM_REQUEST,
-	ST_WAITING_ITEM_CONSTRAINT,
-	ST_NEGOTIATION_FINISHED
+	ST_UCC_WAITING_ITEM_REQUEST,
+	ST_UCC_WAITING_ITEM_CONSTRAINT,
+
+	ST_UCC_NEGOTIATION_FINISHED
 };
 
 UCC::UCC(Node *node, uint16_t contributedItemId, uint16_t constraintItemId) :
@@ -16,7 +16,7 @@ UCC::UCC(Node *node, uint16_t contributedItemId, uint16_t constraintItemId) :
 	_negotiationAgreement(false)
 {
 	// TODO: Save input parameters
-	setState(ST_WAITING_ITEM_REQUEST);
+	setState(ST_UCC_WAITING_ITEM_REQUEST);
 }
 
 UCC::~UCC()
@@ -37,33 +37,27 @@ void UCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 		// TODO: Handle packets
 	case PacketType::RequestItem:
 	{
-		if (state() == ST_WAITING_ITEM_REQUEST)
+		if (state() == ST_UCC_WAITING_ITEM_REQUEST)
 		{
-			PacketRequestItem iPacketData;
-			iPacketData.Read(stream);
-			if (iPacketData.requestedItemId != _contributedItemId) {
-				// Should send error...
-			}
-
 			// Send back PacketType::RequestItemResponse with the constraint
 			PacketHeader oPacketHead;
 			oPacketHead.packetType = PacketType::RequestItemResponse;
 			oPacketHead.srcAgentId = id();
 			oPacketHead.dstAgentId = packetHeader.srcAgentId;
+
+			/* Do nothing with item requested
+			PacketRequestItem iPacketData;
+			iPacketData.Read(stream);*/
+
 			PacketRequestItemResponse oPacketData;
 			oPacketData.constraintItemId = _constraintItemId;
+
 			OutputMemoryStream ostream;
 			oPacketHead.Write(ostream);
 			oPacketData.Write(ostream);
-			socket->SendPacket(ostream.GetBufferPtr(), ostream.GetSize());
 
-			if (_constraintItemId == NULL_ITEM_ID) {
-				_negotiationAgreement = true;
-				setState(ST_NEGOTIATION_FINISHED);
-			}
-			else {
-				setState(ST_WAITING_ITEM_CONSTRAINT);
-			}
+			socket->SendPacket(ostream.GetBufferPtr(), ostream.GetSize());
+			setState(ST_UCC_WAITING_ITEM_CONSTRAINT);
 		}
 		else
 		{
@@ -73,25 +67,26 @@ void UCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 	}
 	case PacketType::SendConstraint:
 	{
-		if (state() == ST_WAITING_ITEM_CONSTRAINT)
+		if (state() == ST_UCC_WAITING_ITEM_CONSTRAINT)
 		{
 			PacketSendConstraint iPacketData;
 			iPacketData.Read(stream);
-			if (iPacketData.constraintItemId != _constraintItemId) {
-				// Should send an error...
-			}
+			_negotiationAgreement = iPacketData.agreement;
+
+			/* Do nothing with item recieved
+			iPacketData.constraintItemId;*/
 
 			// Send back PacketType::RequestItemResponse with the constraint
 			PacketHeader oPacketHead;
-			oPacketHead.packetType = PacketType::RequestItemResponse;
+			oPacketHead.packetType = PacketType::SendConstraintResponse;
 			oPacketHead.srcAgentId = id();
 			oPacketHead.dstAgentId = packetHeader.srcAgentId;
+			
 			OutputMemoryStream ostream;
 			oPacketHead.Write(ostream);
-			socket->SendPacket(ostream.GetBufferPtr(), ostream.GetSize());
 
-			_negotiationAgreement = true;
-			setState(ST_NEGOTIATION_FINISHED);
+			socket->SendPacket(ostream.GetBufferPtr(), ostream.GetSize());
+			setState(ST_UCC_NEGOTIATION_FINISHED);
 		}
 		else
 		{
@@ -107,7 +102,7 @@ void UCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 
 bool UCC::negotiationFinished() const
 {
-	return state() == ST_NEGOTIATION_FINISHED;
+	return state() == ST_UCC_NEGOTIATION_FINISHED;
 }
 
 bool UCC::negotiationAgreement() const

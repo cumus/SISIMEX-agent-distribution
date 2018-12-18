@@ -2,25 +2,31 @@
 #include "MCP.h"
 #include "Application.h"
 #include "ModuleAgentContainer.h"
+#include "ModuleNodeCluster.h"
 
 
 // TODO: Make an enum with the states
 enum State
 {
-	ST_INIT,
-	ST_REQUESTING_ITEM,
-	ST_RESOLVING_CONSTRAINT,
-	ST_NEGOTIATION_FINISHED,
+	ST_UCP_INIT,
+
+	ST_UCP_REQUESTING_ITEM,
+	ST_UCP_RESOLVING_CONSTRAINT,
+	ST_UCP_SENDING_CONSTRAIN,
+
+	ST_UCP_NEGOTIATION_FINISHED
 };
 
 UCP::UCP(Node *node, uint16_t requestedItemId, uint16_t contributedItemId, const AgentLocation &uccLocation, unsigned int searchDepth) :
 	Agent(node),
 	_requestedItemId(requestedItemId),
+	_contributedItemId(contributedItemId),
 	_uccLocation(uccLocation),
+	searchDepth(searchDepth),
 	_negotiationAgreement(false)
 {
 	// TODO: Save input parameters
-	setState(ST_INIT);
+	setState(ST_UCP_INIT);
 }
 
 UCP::~UCP()
@@ -32,19 +38,53 @@ void UCP::update()
 	switch (state())
 	{
 		// TODO: Handle states
-	case ST_INIT:
-		requestItem();
-		setState(ST_REQUESTING_ITEM);
+	case ST_UCP_INIT:
+	{
+		// Send PacketType::RequestItem to agent
+		PacketHeader oPacketHead;
+		oPacketHead.packetType = PacketType::RequestItem;
+		oPacketHead.srcAgentId = id();
+		oPacketHead.dstAgentId = _uccLocation.agentId;
+
+		PacketRequestItem oPacketData;
+		oPacketData.requestedItemId = _requestedItemId;
+
+		OutputMemoryStream ostream;
+		oPacketHead.Write(ostream);
+		oPacketData.Write(ostream);
+		
+		sendPacketToAgent(_uccLocation.hostIP, _uccLocation.hostPort, ostream);
+		setState(ST_UCP_REQUESTING_ITEM);
+
 		break;
-	case ST_RESOLVING_CONSTRAINT:
-		if (_mcp->negotiationFinished()) {
-			sendConstraint(_mcp->requestedItemId());
+	}
+	case ST_UCP_RESOLVING_CONSTRAINT:
+	{
+		if (_mcp->negotiationFinished())
+		{
 			_negotiationAgreement = _mcp->negotiationAgreement();
-			setState(ST_NEGOTIATION_FINISHED);
+
+			PacketHeader oPacketHead;
+			oPacketHead.packetType = PacketType::SendConstraint;
+			oPacketHead.srcAgentId = id();
+			oPacketHead.dstAgentId = _uccLocation.agentId;
+
+			PacketSendConstraint oPacketData;
+			oPacketData.agreement = _negotiationAgreement;
+			oPacketData.constraintItemId = _contributedItemId;
+
+			OutputMemoryStream ostream;
+			oPacketHead.Write(ostream);
+			oPacketData.Write(ostream);
+
+			sendPacketToAgent(_uccLocation.hostIP, _uccLocation.hostPort, ostream);
+
+			setState(ST_UCP_SENDING_CONSTRAIN);
 			destroyChildMCP();
 		}
-		break;
 
+		break;
+	}
 	default:;
 	}
 }
@@ -65,23 +105,76 @@ void UCP::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 		// TODO: Handle packets
 	case PacketType::RequestItemResponse:
 	{
-		if (state() == ST_REQUESTING_ITEM)
+		if (state() == ST_UCP_REQUESTING_ITEM)
 		{
 			PacketRequestItemResponse packetData;
 			packetData.Read(stream);
-			if (packetData.constraintItemId != NULL_ITEM_ID) {
-				createChildMCP(packetData.constraintItemId);
-				setState(ST_RESOLVING_CONSTRAINT);
+			_constraintUCCItemId = packetData.constraintItemId;
+
+			if (_constraintUCCItemId != _contributedItemId)
+			{
+				if (searchDepth < App->modNodeCluster->MaxDepth())
+				{
+					createChildMCP(_constraintUCCItemId);
+					socket->Disconnect();
+					setState(ST_UCP_RESOLVING_CONSTRAINT);
+				}
+				else
+				{
+					PacketHeader oPacketHead;
+					oPacketHead.packetType = PacketType::SendConstraint;
+					oPacketHead.srcAgentId = id();
+					oPacketHead.dstAgentId = _uccLocation.agentId;
+
+					PacketSendConstraint oPacketData;
+					oPacketData.agreement = _negotiationAgreement;
+					oPacketData.constraintItemId = _contributedItemId;
+
+					OutputMemoryStream ostream;
+					oPacketHead.Write(ostream);
+					oPacketData.Write(ostream);
+
+					socket->SendPacket(ostream.GetBufferPtr(), ostream.GetSize());
+					setState(ST_UCP_SENDING_CONSTRAIN);
+				}
 			}
 			else
 			{
 				_negotiationAgreement = true;
-				setState(ST_NEGOTIATION_FINISHED);
+
+				PacketHeader oPacketHead;
+				oPacketHead.packetType = PacketType::SendConstraint;
+				oPacketHead.srcAgentId = id();
+				oPacketHead.dstAgentId = _uccLocation.agentId;
+
+				PacketSendConstraint oPacketData;
+				oPacketData.agreement = _negotiationAgreement;
+				oPacketData.constraintItemId = _contributedItemId;
+
+				OutputMemoryStream ostream;
+				oPacketHead.Write(ostream);
+				oPacketData.Write(ostream);
+
+				socket->SendPacket(ostream.GetBufferPtr(), ostream.GetSize());
+				setState(ST_UCP_SENDING_CONSTRAIN);
 			}
 		}
 		else
 		{
 			wLog << "OnPacketReceived() - PacketType::RequestItemResponse was unexpected.";
+		}
+		break;
+	}
+	case PacketType::SendConstraintResponse:
+	{
+		if (state() == ST_UCP_SENDING_CONSTRAIN)
+		{
+			socket->Disconnect();
+			setState(ST_UCP_NEGOTIATION_FINISHED);
+		}
+		else
+		{
+			wLog << "OnPacketReceived() - PacketType::SendConstraintResponse was unexpected.";
 		}
 		break;
 	}
@@ -91,55 +184,16 @@ void UCP::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 }
 
 bool UCP::negotiationFinished() const {
-	return state() == ST_NEGOTIATION_FINISHED;
+	return state() == ST_UCP_NEGOTIATION_FINISHED;
 }
 
 bool UCP::negotiationAgreement() const {
 	return _negotiationAgreement;
 }
 
-
-void UCP::requestItem()
-{
-	// Send PacketType::RequestItem to agent
-	PacketHeader oPacketHead;
-	oPacketHead.packetType = PacketType::RequestItem;
-	oPacketHead.srcAgentId = id();
-	oPacketHead.dstAgentId = _uccLocation.agentId;
-	PacketRequestItem oPacketData;
-	oPacketData.requestedItemId = _requestedItemId;
-
-	OutputMemoryStream ostream;
-	oPacketHead.Write(ostream);
-	oPacketData.Write(ostream);
-
-	const std::string &ip = _uccLocation.hostIP;
-	const uint16_t port = _uccLocation.hostPort;
-	sendPacketToAgent(ip, port, ostream);
-}
-
-void UCP::sendConstraint(uint16_t constraintItemId)
-{
-	// Send PacketType::RequestItem to agent
-	PacketHeader oPacketHead;
-	oPacketHead.packetType = PacketType::SendConstraint;
-	oPacketHead.srcAgentId = id();
-	oPacketHead.dstAgentId = _uccLocation.agentId;
-	PacketSendConstraint oPacketData;
-	oPacketData.constraintItemId = constraintItemId;
-
-	OutputMemoryStream ostream;
-	oPacketHead.Write(ostream);
-	oPacketData.Write(ostream);
-
-	const std::string &ip = _uccLocation.hostIP;
-	const uint16_t port = _uccLocation.hostPort;
-	sendPacketToAgent(ip, port, ostream);
-}
-
 void UCP::createChildMCP(uint16_t constraintItemId)
 {
-	destroyChildMCP(); // just in case
+	_mcp.reset();
 	_mcp = App->agentContainer->createMCP(node(), _requestedItemId, constraintItemId, searchDepth + 1);
 }
 

@@ -30,18 +30,19 @@ public:
 
 private:
 
-	void requestItem();
+	// UCP data
+	uint16_t _requestedItemId; /**< The item to request. */
+	uint16_t _contributedItemId;
+	uint16_t _constraintUCCItemId;
+	AgentLocation _uccLocation; /**< Location of the remote UCC agent. */
+	unsigned int searchDepth = 0;
+
+	// MCP
+	MCPPtr _mcp; /**< The child MCP. */
 	void createChildMCP(uint16_t constraintItemId);
-	void sendConstraint(uint16_t constraintItemId);
 	void destroyChildMCP();
 
-	uint16_t _requestedItemId; /**< The item to request. */
-
-	AgentLocation _uccLocation; /**< Location of the remote UCC agent. */
-
-	MCPPtr _mcp; /**< The child MCP. */
-
+	// Agreement
 	bool _negotiationAgreement; /**< Was there a negotiation agreement? */
-	unsigned int searchDepth = 0;
 };
 

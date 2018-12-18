@@ -48,7 +48,6 @@ private:
 	// TODO: Add extra attributes and methods?
 	
 	bool _negotiationAgreement; /**< Was there a negotiation agreement? */
-	bool sendNegotiationRequest(const AgentLocation &mccRegister);
 
 	// UCP
 	UCPPtr _ucp;

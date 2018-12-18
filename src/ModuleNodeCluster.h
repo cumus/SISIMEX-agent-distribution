@@ -33,6 +33,13 @@ public:
 
 	void OnDisconnected(TCPSocketPtr socket) override;
 
+
+	// User criteria
+
+	int MaxDepth() const { return max_depth; }
+
+	int MaxNearest() const { return max_mcc_iterations; }
+
 private:
 
 	bool startSystem();
@@ -41,14 +48,18 @@ private:
 
 	void stopSystem();
 
-
 	void spawnMCP(int nodeId, int requestedItemId, int contributedItemId);
 
 	void spawnMCC(int nodeId, int contributedItemId, int constraintItemId);
 
-
-
 	std::vector<NodePtr> _nodes; /**< Array of nodes spawn in this host. */
 
 	int state = 0; /**< State machine. */
+
+
+	// User criteria
+
+	int max_depth = 10; // mcp max depth
+
+	int max_mcc_iterations = 5; // mcp checks x nearest mcc's
 };

@@ -50,7 +50,9 @@ void MCC::update()
 		// TODO: Handle other states
 	case ST_MCC_NEGOTIATING:
 		if (_ucc->negotiationFinished()) {
-			if (_ucc->negotiationAgreement()) {
+			if (_ucc->negotiationAgreement())
+			{
+				negociation_succesful = true;
 				setState(ST_MCC_NEGOTIATION_FINISHED);
 			}
 			else {
@@ -99,11 +101,8 @@ void MCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 	// TODO: Handle other packets
 	case PacketType::NegociationProposalRequest:
 	{
-		if (state() == ST_MCC_IDLE)
+		if (state() == ST_MCC_IDLE || CurrentlyNegotiating())
 		{
-			// Create UCC
-			createChildUCC();
-
 			// Send negotiation response
 			PacketHeader oPacketHead;
 			oPacketHead.packetType = PacketType::NegociationProposalAnswer;
@@ -111,34 +110,34 @@ void MCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 			oPacketHead.dstAgentId = packetHeader.srcAgentId;
 
 			PacketStartNegotiationResponse oPacketData;
-			oPacketData.uccAgentId = _ucc->id();
+			oPacketData.negociation_approved = false;
+
+			if (!CurrentlyNegotiating())// && VALID)
+			{
+				// Create UCC
+				createChildUCC();
+
+				AgentLocation ucclocation;
+				ucclocation.hostIP = socket->RemoteAddress().GetIPString();
+				ucclocation.agentId = _ucc->id();
+				ucclocation.hostPort = LISTEN_PORT_AGENTS;
+
+				oPacketData.ucc_location = ucclocation;
+				oPacketData.negociation_approved = true;
+
+				negociation_succesful = false;
+				setState(ST_MCC_NEGOTIATING);
+			}
 
 			OutputMemoryStream ostream;
 			oPacketHead.Write(ostream);
 			oPacketData.Write(ostream);
 
-			const std::string ip = socket->RemoteAddress().GetIPString();
-			uint16_t port = LISTEN_PORT_AGENTS;
-			sendPacketToAgent(ip, port, ostream);
-
-			setState(ST_MCC_NEGOTIATING);
+			socket->SendPacket(ostream.GetBufferPtr(), ostream.GetSize());
 		}
 		else
 		{
 			wLog << "OnPacketReceived() - PacketType::NegociationProposalRequest was unexpected.";
-		}
-		break;
-	}
-	case PacketType::UnregisterMCCAck:
-	{
-		if (state() == ST_MCC_UNREGISTERING)
-		{
-			setState(ST_MCC_FINISHED);
-			socket->Disconnect();
-		}
-		else
-		{
-			wLog << "OnPacketReceived() - PacketType::UnregisterMCCAck was unexpected.";
 		}
 		break;
 	}
@@ -162,7 +161,12 @@ bool MCC::negotiationAgreement() const
 {
 	// If this agent finished, means that it was an agreement
 	// Otherwise, it would return to state ST_IDLE
-	return negotiationFinished();
+	return negociation_succesful; // negotiationFinished();
+}
+
+bool MCC::CurrentlyNegotiating() const
+{
+	return state() > ST_MCC_IDLE && state() < ST_MCC_FINISHED;
 }
 
 bool MCC::registerIntoYellowPages()
@@ -204,7 +208,7 @@ void MCC::unregisterFromYellowPages()
 void MCC::createChildUCC()
 {
 	// TODO: Create a unicast contributor
-	destroyChildUCC(); // just in case
+	_ucc.reset();
 	_ucc = App->agentContainer->createUCC(node(), _contributedItemId, _constraintItemId);
 }
 

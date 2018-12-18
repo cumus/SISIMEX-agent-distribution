@@ -13,7 +13,6 @@ enum class PacketType
 	RegisterMCC,
 	RegisterMCCAck,
 	UnregisterMCC,
-	UnregisterMCCAck,
 
 	// MCP <-> YP
 	QueryMCCsForItem,
@@ -131,12 +130,15 @@ public:
 
 class PacketStartNegotiationResponse {
 public:
-	uint16_t uccAgentId;
+	bool negociation_approved;
+	AgentLocation ucc_location;
 	void Read(InputMemoryStream &stream) {
-		stream.Read(uccAgentId);
+		stream.Read(negociation_approved);
+		ucc_location.Read(stream);
 	}
 	void Write(OutputMemoryStream &stream) {
-		stream.Write(uccAgentId);
+		stream.Write(negociation_approved);
+		ucc_location.Write(stream);
 	}
 };
 
@@ -167,11 +169,14 @@ public:
 
 class PacketSendConstraint {
 public:
+	bool agreement;
 	uint16_t constraintItemId;
 	void Read(InputMemoryStream &stream) {
+		stream.Read(agreement);
 		stream.Read(constraintItemId);
 	}
 	void Write(OutputMemoryStream &stream) {
+		stream.Write(agreement);
 		stream.Write(constraintItemId);
 	}
 };
