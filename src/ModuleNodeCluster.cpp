@@ -6,6 +6,7 @@
 #include "Packets.h"
 #include "imgui/imgui.h"
 #include <sstream>
+#include <algorithm>
 
 enum State {
 	STOPPED,
@@ -56,7 +57,9 @@ bool ModuleNodeCluster::update()
 
 bool ModuleNodeCluster::updateGUI()
 {
-	ImGui::Begin("Node cluster");
+	int windowFlags = ImGuiWindowFlags_::ImGuiWindowFlags_NoResize | ImGuiWindowFlags_::ImGuiWindowFlags_NoMove;
+
+	ImGui::Begin("Node cluster", NULL, windowFlags);
 
 	if (state == RUNNING)
 	{
@@ -187,7 +190,7 @@ bool ModuleNodeCluster::updateGUI()
 	{
 		// NODES / ITEMS MATRIX /////////////////////////////////////////////////////////
 
-		ImGui::Begin("Nodes/Items Matrix");
+		ImGui::Begin("Nodes/Items Matrix", NULL, windowFlags);
 
 		static ItemId selectedItem = 0;
 		static unsigned int selectedNode = 0;
@@ -305,6 +308,23 @@ bool ModuleNodeCluster::updateGUI()
 		}
 
 		ImGui::End();
+
+		// Negociations
+		ImGui::Begin("Negociations Controller");
+
+		for (int i = 0; i < MAX_NODES; ++i)
+		{
+			ImGui::Text("Node %i:", i);
+
+			for (uint16_t n : negotiations[i])
+			{
+				ImGui::SameLine();
+				ImGui::Text("-%i", n);
+			}
+		}
+
+
+		ImGui::End();
 	}
 
 	return true;
@@ -351,6 +371,23 @@ void ModuleNodeCluster::OnDisconnected(TCPSocketPtr socket)
 	// Nothing to do
 }
 
+bool ModuleNodeCluster::NodeMissingConstraint(uint16_t agentID, uint16_t constraintItemId)
+{
+	std::vector<uint16_t> &constraints = negotiations[agentID];
+	return constraints.empty() || std::find(constraints.begin(), constraints.end(), constraintItemId) == constraints.end();
+}
+
+void ModuleNodeCluster::AddConstraintToNode(uint16_t agentID, uint16_t constraintItemId)
+{
+	negotiations[agentID].push_back(constraintItemId);
+}
+
+void ModuleNodeCluster::WithdrawFromNode(uint16_t agentID, uint16_t itemId)
+{
+	std::vector<uint16_t> &constraints = negotiations[agentID];
+	constraints.erase(std::remove(constraints.begin(), constraints.end(), itemId), constraints.end());
+}
+
 bool ModuleNodeCluster::startSystem()
 {
 	iLog << "--------------------------------------------";
@@ -391,6 +428,7 @@ bool ModuleNodeCluster::startSystem()
 		NodePtr node = std::make_shared<Node>(i);
 		node->itemList().initializeComplete();
 		_nodes.push_back(node);
+		negotiations[i].clear();
 	}
 
 	// Randomize

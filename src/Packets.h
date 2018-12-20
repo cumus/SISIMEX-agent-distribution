@@ -13,6 +13,7 @@ enum class PacketType
 	RegisterMCC,
 	RegisterMCCAck,
 	UnregisterMCC,
+	UnregisterMCCAck,
 
 	// MCP <-> YP
 	QueryMCCsForItem,

@@ -23,6 +23,7 @@
     <ProjectGuid>{71306BC8-7343-4BB3-B7C9-FA908B4818C8}</ProjectGuid>
     <RootNamespace>SiSiMEX</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
+    <ProjectName>SiSiMEX Agent Distribution</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

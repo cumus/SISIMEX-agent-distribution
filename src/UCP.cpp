@@ -121,6 +121,7 @@ void UCP::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 				}
 				else
 				{
+					_negotiationAgreement = false;
 					PacketHeader oPacketHead;
 					oPacketHead.packetType = PacketType::SendConstraint;
 					oPacketHead.srcAgentId = id();
@@ -128,7 +129,7 @@ void UCP::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 
 					PacketSendConstraint oPacketData;
 					oPacketData.agreement = _negotiationAgreement;
-					oPacketData.constraintItemId = _contributedItemId;
+					oPacketData.constraintItemId = NULL_ITEM_ID;
 
 					OutputMemoryStream ostream;
 					oPacketHead.Write(ostream);
@@ -194,7 +195,7 @@ bool UCP::negotiationAgreement() const {
 void UCP::createChildMCP(uint16_t constraintItemId)
 {
 	_mcp.reset();
-	_mcp = App->agentContainer->createMCP(node(), _requestedItemId, constraintItemId, searchDepth + 1);
+	_mcp = App->agentContainer->createMCP(node(), constraintItemId, _contributedItemId, searchDepth + 1);
 }
 
 void UCP::destroyChildMCP()

@@ -5,6 +5,7 @@
 #include "Node.h"
 #include "MCC.h"
 #include "MCP.h"
+#include <map>
 
 class ModuleNodeCluster : public Module, public TCPNetworkManagerDelegate
 {
@@ -40,6 +41,12 @@ public:
 
 	int MaxNearest() const { return max_mcc_iterations; }
 
+	// Negociations
+
+	bool NodeMissingConstraint(uint16_t agentID, uint16_t constraintItemId);
+	void AddConstraintToNode(uint16_t agentID, uint16_t constraintItemId);
+	void WithdrawFromNode(uint16_t agentID, uint16_t itemId);
+
 private:
 
 	bool startSystem();
@@ -62,4 +69,9 @@ private:
 	int max_depth = 10; // mcp max depth
 
 	int max_mcc_iterations = 5; // mcp checks x nearest mcc's
+
+	// Negociations
+
+	std::map<uint16_t, std::vector<uint16_t>> negotiations;
+
 };

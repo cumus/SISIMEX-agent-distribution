@@ -31,9 +31,6 @@ public:
 	// Whether or not there was a negotiation agreement
 	bool negotiationAgreement() const;
 
-	// Whether or not a negociation is in course
-	bool CurrentlyNegotiating() const;
-
 private:
 
 	uint16_t _contributedItemId; /**< The contributed item. */
@@ -47,5 +44,5 @@ private:
 	void createChildUCC();
 	void destroyChildUCC();
 
-	bool negociation_succesful = false;
+	bool _negotiationAgreement = false;
 };

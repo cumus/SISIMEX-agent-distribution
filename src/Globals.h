@@ -42,8 +42,8 @@ static const uint16_t NULL_ITEM_ID = 9999;
 
 #if defined(RANDOM_INITIALIZATION)
 
-static const unsigned int MAX_ITEMS = 10U;
-static const unsigned int MAX_NODES = 10U;
+static const unsigned int MAX_ITEMS = 15U;
+static const unsigned int MAX_NODES = 15U;
 
 #else
 

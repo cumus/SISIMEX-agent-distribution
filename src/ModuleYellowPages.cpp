@@ -176,6 +176,7 @@ void ModuleYellowPages::OnPacketReceived(TCPSocketPtr socket, InputMemoryStream 
 		std::list<AgentLocation> &mccs(_mccByItem[inPacketData.itemId]);
 		for (auto it = mccs.begin(); it != mccs.end();) {
 			if (it->agentId == inPacketHead.srcAgentId) {
+				iLog << "MCC  " << it->agentId << " unregistred";
 				auto oldIt = it++;
 				mccs.erase(oldIt);
 				break;
@@ -185,13 +186,15 @@ void ModuleYellowPages::OnPacketReceived(TCPSocketPtr socket, InputMemoryStream 
 			}
 		}
 
-		//// Send RegisterMCCAck packet
-		//OutputMemoryStream outStream;
-		//PacketHeader outPacket;
-		//outPacket.packetType = PacketType::UnregisterMCCAck;
-		//outPacket.dstAgentId = inPacketHead.srcAgentId;
-		//outPacket.Write(outStream);
-		//socket->SendPacket(outStream.GetBufferPtr(), outStream.GetSize());
+
+		// Send RegisterMCCAck packet
+		PacketHeader outPacket;
+		outPacket.packetType = PacketType::UnregisterMCCAck;
+		outPacket.dstAgentId = inPacketHead.srcAgentId;
+
+		OutputMemoryStream outStream;
+		outPacket.Write(outStream);
+		socket->SendPacket(outStream.GetBufferPtr(), outStream.GetSize());
 	}
 	else if (inPacketHead.packetType == PacketType::QueryMCCsForItem)
 	{
@@ -210,10 +213,11 @@ void ModuleYellowPages::OnPacketReceived(TCPSocketPtr socket, InputMemoryStream 
 		}
 
 		// Send response packet
-		OutputMemoryStream outStream;
 		PacketHeader outPacketHead;
 		outPacketHead.packetType = PacketType::ReturnMCCsForItem;
 		outPacketHead.dstAgentId = inPacketHead.srcAgentId;
+
+		OutputMemoryStream outStream;
 		outPacketHead.Write(outStream);
 		outPacketData.Write(outStream);
 		socket->SendPacket(outStream.GetBufferPtr(), outStream.GetSize());

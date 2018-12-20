@@ -76,7 +76,6 @@ void UCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 			/* Do nothing with item recieved
 			iPacketData.constraintItemId;*/
 
-			// Send back PacketType::RequestItemResponse with the constraint
 			PacketHeader oPacketHead;
 			oPacketHead.packetType = PacketType::SendConstraintResponse;
 			oPacketHead.srcAgentId = id();

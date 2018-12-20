@@ -2,6 +2,7 @@
 #include "UCC.h"
 #include "Application.h"
 #include "ModuleAgentContainer.h"
+#include "ModuleNodeCluster.h"
 
 
 enum State
@@ -49,15 +50,19 @@ void MCC::update()
 
 		// TODO: Handle other states
 	case ST_MCC_NEGOTIATING:
-		if (_ucc->negotiationFinished()) {
+		if (_ucc->negotiationFinished())
+		{
 			if (_ucc->negotiationAgreement())
 			{
-				negociation_succesful = true;
+				_negotiationAgreement = true;
 				setState(ST_MCC_NEGOTIATION_FINISHED);
 			}
-			else {
+			else
+			{
 				setState(ST_MCC_IDLE);
 			}
+
+			App->modNodeCluster->WithdrawFromNode(node()->id(), _contributedItemId);
 			destroyChildUCC();
 		}
 		break;
@@ -65,7 +70,8 @@ void MCC::update()
 		// See OnPacketReceived()
 		break;
 	case ST_MCC_FINISHED:
-		destroy();
+		if (isValid())
+			destroy();
 	}
 }
 
@@ -75,7 +81,7 @@ void MCC::stop()
 	destroyChildUCC();
 
 	unregisterFromYellowPages();
-	setState(ST_MCC_FINISHED);
+	setState(ST_MCC_UNREGISTERING);
 }
 
 
@@ -101,7 +107,7 @@ void MCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 	// TODO: Handle other packets
 	case PacketType::NegociationProposalRequest:
 	{
-		if (state() == ST_MCC_IDLE || CurrentlyNegotiating())
+		if (state() >= ST_MCC_IDLE && state() < ST_MCC_FINISHED)
 		{
 			// Send negotiation response
 			PacketHeader oPacketHead;
@@ -112,8 +118,11 @@ void MCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 			PacketStartNegotiationResponse oPacketData;
 			oPacketData.negociation_approved = false;
 
-			if (!CurrentlyNegotiating())// && VALID)
+			if (state() == ST_MCC_IDLE
+				&& App->modNodeCluster->NodeMissingConstraint(node()->id(), _contributedItemId))
 			{
+				App->modNodeCluster->AddConstraintToNode(node()->id(), _contributedItemId);
+				
 				// Create UCC
 				createChildUCC();
 
@@ -125,7 +134,7 @@ void MCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 				oPacketData.ucc_location = ucclocation;
 				oPacketData.negociation_approved = true;
 
-				negociation_succesful = false;
+				//_negotiationAgreement = false;
 				setState(ST_MCC_NEGOTIATING);
 			}
 
@@ -142,6 +151,19 @@ void MCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 		break;
 	}
 
+	case PacketType::UnregisterMCCAck:
+	{
+		if (state() == ST_MCC_UNREGISTERING)
+		{
+			setState(ST_MCC_FINISHED);
+			socket->Disconnect();
+		}
+		else
+		{
+			wLog << "OnPacketReceived() - PacketType::UnregisterMCCAck was unexpected.";
+		}
+		break;
+	}
 	default:
 		wLog << "OnPacketReceived() - Unexpected PacketType.";
 	}
@@ -154,19 +176,14 @@ bool MCC::isIdling() const
 
 bool MCC::negotiationFinished() const
 {
-	return state() == ST_MCC_FINISHED;
+	return state() == ST_MCC_NEGOTIATION_FINISHED;
 }
 
 bool MCC::negotiationAgreement() const
 {
 	// If this agent finished, means that it was an agreement
 	// Otherwise, it would return to state ST_IDLE
-	return negociation_succesful; // negotiationFinished();
-}
-
-bool MCC::CurrentlyNegotiating() const
-{
-	return state() > ST_MCC_IDLE && state() < ST_MCC_FINISHED;
+	return _negotiationAgreement; // negotiationFinished();
 }
 
 bool MCC::registerIntoYellowPages()
