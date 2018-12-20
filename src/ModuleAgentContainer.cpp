@@ -21,9 +21,9 @@ MCCPtr ModuleAgentContainer::createMCC(Node *node, uint16_t contributedItemId, u
 	return mcc;
 }
 
-MCPPtr ModuleAgentContainer::createMCP(Node *node, uint16_t requestedItemId, uint16_t contributedItemId, unsigned int searchDepth)
+MCPPtr ModuleAgentContainer::createMCP(Node *node, uint16_t requestedItemId, uint16_t contributedItemId, unsigned int searchDepth, double distance_traveled)
 {
-	MCPPtr mcp(new MCP(node, requestedItemId, contributedItemId, searchDepth));
+	MCPPtr mcp(new MCP(node, requestedItemId, contributedItemId, searchDepth, distance_traveled));
 	addAgent(mcp);
 	return mcp;
 }
@@ -35,9 +35,9 @@ UCCPtr ModuleAgentContainer::createUCC(Node *node, uint16_t contributedItemId, u
 	return ucc;
 }
 
-UCPPtr ModuleAgentContainer::createUCP(Node *node, uint16_t requestedItemId, uint16_t contributedItemId, const AgentLocation &uccLocation, unsigned int searchDepth)
+UCPPtr ModuleAgentContainer::createUCP(Node *node, uint16_t requestedItemId, uint16_t contributedItemId, const AgentLocation &uccLocation, unsigned int searchDepth, double distance_traveled)
 {
-	UCPPtr ucp(new UCP(node, requestedItemId, contributedItemId, uccLocation, searchDepth));
+	UCPPtr ucp(new UCP(node, requestedItemId, contributedItemId, uccLocation, searchDepth, distance_traveled));
 	addAgent(ucp);
 	return ucp;
 }

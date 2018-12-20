@@ -42,8 +42,8 @@ static const uint16_t NULL_ITEM_ID = 9999;
 
 #if defined(RANDOM_INITIALIZATION)
 
-static const unsigned int MAX_ITEMS = 15U;
-static const unsigned int MAX_NODES = 15U;
+static const unsigned int MAX_ITEMS = 10U;
+static const unsigned int MAX_NODES = 10U;
 
 #else
 
@@ -52,11 +52,8 @@ static const unsigned int MAX_NODES = 4U;
 
 #endif
 
-/**
- * MAX_SEARCH_DEPTH
- * This the maximum depth of the search performed by MCP/UCP agents.
- * If MAX_SEARCH_DEPTH == 0, only bilateral exchanges will be found.
- * If MAX_SEARCH_DEPTH == 1, trilateral exchanges will be also found.
- * etc.
- */
-#define MAX_SEARCH_DEPTH 4
+// Map dimensions to set position for Nodes
+
+static const int MAP_WIDTH = 100;
+static const int MAP_HEIGHT = 100;
+

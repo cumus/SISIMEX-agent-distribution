@@ -4,6 +4,7 @@
 #include "Application.h"
 #include "Log.h"
 #include "Packets.h"
+#include "UCP.h"
 #include "imgui/imgui.h"
 #include <sstream>
 #include <algorithm>
@@ -57,7 +58,7 @@ bool ModuleNodeCluster::update()
 
 bool ModuleNodeCluster::updateGUI()
 {
-	int windowFlags = ImGuiWindowFlags_::ImGuiWindowFlags_NoResize | ImGuiWindowFlags_::ImGuiWindowFlags_NoMove;
+	int windowFlags = ImGuiWindowFlags_None; // ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 
 	ImGui::Begin("Node cluster", NULL, windowFlags);
 
@@ -85,7 +86,7 @@ bool ModuleNodeCluster::updateGUI()
 
 		ImGui::Separator();
 
-		if (ImGui::Button("Create random MCCs"))
+		if (ImGui::Button("Create MCCs"))
 		{
 			for (NodePtr node : _nodes)
 			{
@@ -126,7 +127,7 @@ bool ModuleNodeCluster::updateGUI()
 			ImGui::PushID(nodeId);
 
 			ImGuiTreeNodeFlags flags = 0;
-			std::string nodeLabel = StringUtils::Sprintf("Node %d", nodeId);
+			std::string nodeLabel = StringUtils::Sprintf("Node %d (%i, %i)", nodeId, node->x(), node->y());
 
 			if (ImGui::CollapsingHeader(nodeLabel.c_str(), flags))
 			{
@@ -310,7 +311,18 @@ bool ModuleNodeCluster::updateGUI()
 		ImGui::End();
 
 		// Negociations
-		ImGui::Begin("Negociations Controller");
+		ImGui::Begin("Negociations Controller", NULL, windowFlags);
+
+		ImGui::Text("Max Depth     ");
+		ImGui::SameLine();
+		ImGui::SliderInt("Depth", &max_depth, -1, 20, "%i");
+		ImGui::Text("Search Closest");
+		ImGui::SameLine();
+		ImGui::SliderInt("Closest", &max_mcc_iterations, -1, 20, "%i");
+		ImGui::Text("Max Distance  ");
+		ImGui::SameLine();
+		ImGui::SliderInt("Distance", &max_travel_distance, -1, (MAP_WIDTH + MAP_HEIGHT) * MAX_NODES, "%i");
+		ImGui::Separator();
 
 		int negociation_depth = 0;
 		for (int i = 0; i < MAX_NODES; ++i)
@@ -326,7 +338,11 @@ bool ModuleNodeCluster::updateGUI()
 		}
 
 		ImGui::Separator();
-		ImGui::SliderInt("Limit Depth", &max_depth, 1, 20, "%i");
+
+		ImGui::Text("Current Search Depth: %i", negociation_depth);
+		ImGui::Text("Current Travel Distance: %.2f", (float)traveled_distance);
+		ImGui::Text("Last Travel Distance: %.2f", (float)last_total_distance);
+
 		ImGui::End();
 	}
 
@@ -372,6 +388,11 @@ void ModuleNodeCluster::OnPacketReceived(TCPSocketPtr socket, InputMemoryStream 
 void ModuleNodeCluster::OnDisconnected(TCPSocketPtr socket)
 {
 	// Nothing to do
+}
+
+void ModuleNodeCluster::ReportLastTravelDistance(double distance)
+{
+	last_total_distance = distance;
 }
 
 bool ModuleNodeCluster::NodeMissingConstraint(uint16_t agentID, uint16_t constraintItemId)
@@ -428,7 +449,7 @@ bool ModuleNodeCluster::startSystem()
 	for (int i = 0; i < MAX_NODES; ++i)
 	{
 		// Create and intialize nodes
-		NodePtr node = std::make_shared<Node>(i);
+		NodePtr node = std::make_shared<Node>(i, rand() % MAP_WIDTH, rand() % MAP_HEIGHT);
 		node->itemList().initializeComplete();
 		_nodes.push_back(node);
 		negotiations[i].clear();
@@ -479,10 +500,18 @@ bool ModuleNodeCluster::startSystem()
 
 void ModuleNodeCluster::runSystem()
 {
+	traveled_distance = 0;
+
 	// Check the results of agents
 	for (AgentPtr agent : App->agentContainer->allAgents())
 	{
 		if (!agent->isValid()) { continue; }
+
+		UCP *ucp = agent->asUCP();
+		if (ucp != nullptr && ucp->TraveledDistance() > traveled_distance)
+		{
+			traveled_distance = ucp->TraveledDistance();
+		}
 
 		// Update ItemList with finalized MCCs
 		MCC *mcc = agent->asMCC();
@@ -550,7 +579,7 @@ void ModuleNodeCluster::spawnMCP(int nodeId, int requestedItemId, int contribute
 	dLog << "Spawn MCP - node " << nodeId << " - req. " << requestedItemId << " - contrib. " << contributedItemId;
 	if (nodeId >= 0 && nodeId < (int)_nodes.size()) {
 		NodePtr node = _nodes[nodeId];
-		App->agentContainer->createMCP(node.get(), requestedItemId, contributedItemId, 1);
+		App->agentContainer->createMCP(node.get(), requestedItemId, contributedItemId, 1, 0);
 	}
 	else {
 		wLog << "Could not find node with ID " << nodeId;

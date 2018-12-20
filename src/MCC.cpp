@@ -3,6 +3,7 @@
 #include "Application.h"
 #include "ModuleAgentContainer.h"
 #include "ModuleNodeCluster.h"
+#include <cmath>
 
 
 enum State
@@ -105,6 +106,31 @@ void MCC::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 		break;
 	}
 	// TODO: Handle other packets
+	case PacketType::PositionRequest:
+	{
+		if (state() >= ST_MCC_IDLE && state() < ST_MCC_FINISHED)
+		{
+			PacketHeader oPacketHead;
+			oPacketHead.packetType = PacketType::PositionAnswer;
+			oPacketHead.srcAgentId = id();
+			oPacketHead.dstAgentId = packetHeader.srcAgentId;
+
+			PacketPositionResponse oPacketData;
+			oPacketData.x = node()->x();
+			oPacketData.y = node()->y();
+
+			OutputMemoryStream ostream;
+			oPacketHead.Write(ostream);
+			oPacketData.Write(ostream);
+
+			socket->SendPacket(ostream.GetBufferPtr(), ostream.GetSize());
+		}
+		else
+		{
+			wLog << "OnPacketReceived() - PacketType::PositionRequest was unexpected.";
+		}
+		break;
+	}
 	case PacketType::NegociationProposalRequest:
 	{
 		if (state() >= ST_MCC_IDLE && state() < ST_MCC_FINISHED)

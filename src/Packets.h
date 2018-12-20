@@ -124,6 +124,25 @@ public:
 // MCP <-> MCC
 //TODO
 
+class PacketPositionRequest {
+public:
+	// This packet has nothing
+};
+
+class PacketPositionResponse {
+public:
+	int x;
+	int y;
+	void Read(InputMemoryStream &stream) {
+		stream.Read(x);
+		stream.Read(y);
+	}
+	void Write(OutputMemoryStream &stream) {
+		stream.Write(x);
+		stream.Write(y);
+	}
+};
+
 class PacketStartNegotiation {
 public:
 	// This packet has nothing

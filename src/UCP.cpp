@@ -17,12 +17,13 @@ enum State
 	ST_UCP_NEGOTIATION_FINISHED
 };
 
-UCP::UCP(Node *node, uint16_t requestedItemId, uint16_t contributedItemId, const AgentLocation &uccLocation, unsigned int searchDepth) :
+UCP::UCP(Node *node, uint16_t requestedItemId, uint16_t contributedItemId, const AgentLocation &uccLocation, unsigned int searchDepth, double distance_traveled) :
 	Agent(node),
 	_requestedItemId(requestedItemId),
 	_contributedItemId(contributedItemId),
 	_uccLocation(uccLocation),
 	searchDepth(searchDepth),
+	distance_traveled(distance_traveled),
 	_negotiationAgreement(false)
 {
 	// TODO: Save input parameters
@@ -142,6 +143,7 @@ void UCP::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 			else
 			{
 				_negotiationAgreement = true;
+				App->modNodeCluster->ReportLastTravelDistance(distance_traveled);
 
 				PacketHeader oPacketHead;
 				oPacketHead.packetType = PacketType::SendConstraint;
@@ -195,7 +197,7 @@ bool UCP::negotiationAgreement() const {
 void UCP::createChildMCP(uint16_t constraintItemId)
 {
 	_mcp.reset();
-	_mcp = App->agentContainer->createMCP(node(), constraintItemId, _contributedItemId, searchDepth + 1);
+	_mcp = App->agentContainer->createMCP(node(), constraintItemId, _contributedItemId, searchDepth + 1, distance_traveled);
 }
 
 void UCP::destroyChildMCP()

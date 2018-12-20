@@ -11,7 +11,7 @@ class UCP :
 public:
 
 	// Constructor and destructor
-	UCP(Node *node, uint16_t requestedItemId, uint16_t contributedItemId, const AgentLocation &uccLoc, unsigned int searchDepth);
+	UCP(Node *node, uint16_t requestedItemId, uint16_t contributedItemId, const AgentLocation &uccLoc, unsigned int searchDepth, double distance_traveled);
 	~UCP();
 
 	// Agent methods
@@ -21,6 +21,8 @@ public:
 	void OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader, InputMemoryStream &stream) override;
 
 	// TODO
+
+	double TraveledDistance() const { return distance_traveled; }
 
 	// Whether or not the negotiation finished
 	bool negotiationFinished() const;
@@ -36,6 +38,7 @@ private:
 	uint16_t _constraintUCCItemId;
 	AgentLocation _uccLocation; /**< Location of the remote UCC agent. */
 	unsigned int searchDepth = 0;
+	double distance_traveled = 0;
 
 	// MCP
 	MCPPtr _mcp; /**< The child MCP. */

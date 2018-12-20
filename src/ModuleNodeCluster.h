@@ -41,6 +41,10 @@ public:
 
 	int MaxNearest() const { return max_mcc_iterations; }
 
+	double MaxTravelDistance() const { return max_travel_distance; }
+
+	void ReportLastTravelDistance(double distance);
+
 	// Negociations
 
 	bool NodeMissingConstraint(uint16_t agentID, uint16_t constraintItemId);
@@ -66,12 +70,17 @@ private:
 
 	// User criteria
 
-	int max_depth = 10; // mcp max depth
+	int max_depth = 5; // mcp max depth
 
-	int max_mcc_iterations = 5; // mcp checks x nearest mcc's
+	int max_mcc_iterations = 5; // mcp only checks x nearest mcc's
+
+	int max_travel_distance = 500; // max item travel distance
 
 	// Negociations
 
 	std::map<uint16_t, std::vector<uint16_t>> negotiations;
 
+	double traveled_distance = 0;
+
+	double last_total_distance = 0;
 };

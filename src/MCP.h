@@ -11,7 +11,7 @@ class MCP :
 public:
 
 	// Constructor and destructor
-	MCP(Node *node, uint16_t requestedItemID, uint16_t contributedItemID, unsigned int searchDepth);
+	MCP(Node *node, uint16_t requestedItemID, uint16_t contributedItemID, unsigned int searchDepth, double distance_traveled);
 	~MCP();
 
 	// Agent methods
@@ -43,7 +43,11 @@ private:
 	int _mccRegisterIndex; /**< Iterator through _mccRegisters. */
 	std::vector<AgentLocation> _mccRegisters; /**< MCCs returned by the YP. */
 
+	std::vector<std::pair<int,double>> distances;
+	std::vector<std::pair<int, double>> ordered_distances;
+
 	unsigned int _searchDepth;
+	double distance_traveled = 0;
 
 	// TODO: Add extra attributes and methods?
 	

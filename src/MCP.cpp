@@ -2,23 +2,27 @@
 #include "UCP.h"
 #include "Application.h"
 #include "ModuleAgentContainer.h"
+#include "ModuleNodeCluster.h"
 
 
 enum State
 {
 	ST_MCP_INIT,
 	ST_MCP_REQUESTING_MCCs,
+	ST_MCP_MCC_POSITION_REQUEST,
+	ST_MCP_MCC_POSITION_RESPONSE,
 	ST_MCP_ITERATING_OVER_MCCs,
 	ST_MCP_WAITING_NEGOTIATION_RESPONSE,
 	ST_MCP_NEGOTIATING,
 	ST_MCP_NEGOTIATION_FINISHED
 };
 
-MCP::MCP(Node *node, uint16_t requestedItemID, uint16_t contributedItemID, unsigned int searchDepth) :
+MCP::MCP(Node *node, uint16_t requestedItemID, uint16_t contributedItemID, unsigned int searchDepth, double distance_traveled) :
 	Agent(node),
 	_requestedItemId(requestedItemID),
 	_contributedItemId(contributedItemID),
 	_searchDepth(searchDepth),
+	distance_traveled(distance_traveled),
 	_mccRegisterIndex(false)
 {
 	setState(ST_MCP_INIT);
@@ -33,15 +37,39 @@ void MCP::update()
 	switch (state())
 	{
 	case ST_MCP_INIT:
+		ordered_distances.clear();
 		queryMCCsForItem(_requestedItemId);
 		setState(ST_MCP_REQUESTING_MCCs);
 		break;
 
-	case ST_MCP_ITERATING_OVER_MCCs:
-		// TODO: Handle this state
+	case ST_MCP_MCC_POSITION_REQUEST:
 		if (_mccRegisterIndex < _mccRegisters.size())
 		{
 			const AgentLocation &agent(_mccRegisters[_mccRegisterIndex]);
+
+			PacketHeader packetHead;
+			packetHead.packetType = PacketType::PositionRequest;
+			packetHead.srcAgentId = id();
+			packetHead.dstAgentId = agent.agentId;
+
+			OutputMemoryStream stream;
+			packetHead.Write(stream);
+
+			sendPacketToAgent(agent.hostIP, agent.hostPort, stream);
+			setState(ST_MCP_MCC_POSITION_RESPONSE);
+		}
+		else
+		{
+			_mccRegisterIndex = 0;
+			setState(ST_MCP_ITERATING_OVER_MCCs);
+		}
+		break;
+	case ST_MCP_ITERATING_OVER_MCCs:
+		// TODO: Handle this state
+		if (_mccRegisterIndex < ordered_distances.size()
+			&& _mccRegisterIndex < App->modNodeCluster->MaxNearest())
+		{
+			const AgentLocation &agent(_mccRegisters[ordered_distances[_mccRegisterIndex].first]);
 
 			PacketHeader packetHead;
 			packetHead.packetType = PacketType::NegociationProposalRequest;
@@ -100,21 +128,12 @@ void MCP::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 			PacketReturnMCCsForItem packetData;
 			packetData.Read(stream);
 
-			// Log the returned MCCs
-			for (auto &mccdata : packetData.mccAddresses)
-			{
-				uint16_t agentId = mccdata.agentId;
-				const std::string &hostIp = mccdata.hostIP;
-				uint16_t hostPort = mccdata.hostPort;
-				//iLog << " - MCC: " << agentId << " - host: " << hostIp << ":" << hostPort;
-			}
-
 			// Store the returned MCCs from YP
 			_mccRegisters.swap(packetData.mccAddresses);
 
 			// Select the first MCC to negociate
 			_mccRegisterIndex = 0;
-			setState(ST_MCP_ITERATING_OVER_MCCs);
+			setState(ST_MCP_MCC_POSITION_REQUEST);
 
 			socket->Disconnect();
 		}
@@ -124,7 +143,48 @@ void MCP::OnPacketReceived(TCPSocketPtr socket, const PacketHeader &packetHeader
 		}
 		break;
 	}
+	case PacketType::PositionAnswer:
+	{
+		if (state() == ST_MCP_MCC_POSITION_RESPONSE)
+		{
+			// Read the packet
+			PacketPositionResponse packetData;
+			packetData.Read(stream);
 
+			double distance = sqrt(pow(node()->x() - packetData.x, 2) + pow(node()->y() - packetData.y, 2));
+
+			if (distance + distance_traveled <= App->modNodeCluster->MaxTravelDistance())
+			{
+				bool ordered = false;
+
+				for (auto agent = ordered_distances.begin(); !ordered && agent != ordered_distances.end();)
+				{
+					if (distance <= agent->second)
+					{
+						ordered = true;
+						ordered_distances.insert(agent, *new std::pair<int, double>(_mccRegisterIndex, distance));
+					}
+					else
+					{
+						agent++;
+					}
+				}
+
+				if (!ordered)
+					ordered_distances.push_back(*new std::pair<int, double>(_mccRegisterIndex, distance));
+			}
+
+			_mccRegisterIndex++;
+			setState(ST_MCP_MCC_POSITION_REQUEST);
+			socket->Disconnect();
+		}
+		else
+		{
+			wLog << "OnPacketReceived() - PacketType::ReturnMCCsForItem was unexpected.";
+		}
+		break;
+	}
+	
 	// TODO: Handle other packets
 	case PacketType::NegociationProposalAnswer:
 	{
@@ -192,7 +252,7 @@ bool MCP::queryMCCsForItem(int itemId)
 void MCP::createChildUCP(const AgentLocation &uccLoc)
 {
 	_ucp.reset();
-	_ucp = App->agentContainer->createUCP(node(), _requestedItemId, _contributedItemId, uccLoc, _searchDepth);
+	_ucp = App->agentContainer->createUCP(node(), _requestedItemId, _contributedItemId, uccLoc, _searchDepth, distance_traveled + ordered_distances[_mccRegisterIndex].second);
 }
 
 void MCP::destroyChildUCP()
