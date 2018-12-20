@@ -312,6 +312,7 @@ bool ModuleNodeCluster::updateGUI()
 		// Negociations
 		ImGui::Begin("Negociations Controller");
 
+		int negociation_depth = 0;
 		for (int i = 0; i < MAX_NODES; ++i)
 		{
 			ImGui::Text("Node %i:", i);
@@ -320,10 +321,12 @@ bool ModuleNodeCluster::updateGUI()
 			{
 				ImGui::SameLine();
 				ImGui::Text("-%i", n);
+				negociation_depth++;
 			}
 		}
 
-
+		ImGui::Separator();
+		ImGui::SliderInt("Limit Depth", &max_depth, 1, 20, "%i");
 		ImGui::End();
 	}
 
@@ -496,7 +499,7 @@ void ModuleNodeCluster::runSystem()
 
 		// Update ItemList with MCPs that found a solution
 		MCP *mcp = agent->asMCP();
-		if (mcp != nullptr && mcp->negotiationFinished() && mcp->searchDepth() == 0)
+		if (mcp != nullptr && mcp->negotiationFinished() && mcp->searchDepth() == 1)
 		{
 			Node *node = mcp->node();
 
@@ -547,7 +550,7 @@ void ModuleNodeCluster::spawnMCP(int nodeId, int requestedItemId, int contribute
 	dLog << "Spawn MCP - node " << nodeId << " - req. " << requestedItemId << " - contrib. " << contributedItemId;
 	if (nodeId >= 0 && nodeId < (int)_nodes.size()) {
 		NodePtr node = _nodes[nodeId];
-		App->agentContainer->createMCP(node.get(), requestedItemId, contributedItemId, 0);
+		App->agentContainer->createMCP(node.get(), requestedItemId, contributedItemId, 1);
 	}
 	else {
 		wLog << "Could not find node with ID " << nodeId;
